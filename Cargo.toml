@@ -10,3 +10,4 @@ serde = { version = "1.0.217", features = ["derive"] }
 tempfile = "3.16.0"
 tokio = { version = "1.43.0", features = ["full"] }
 wasmer = "5.0.4"
+wasmer-wasi = "3.1.1"

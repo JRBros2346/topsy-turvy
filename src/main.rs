@@ -30,11 +30,11 @@ impl IntoResponse for Output {
     fn into_response(self) -> Response<Body> {
         use axum::http::StatusCode;
         match self {
-            Output::ServerError => axum::http::Response::builder()
+            Output::ServerError => Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                 .body(Body::empty())
                 .unwrap(),
-            Output::CannotCompile(err) => axum::http::Response::builder()
+            Output::CannotCompile(err) => Response::builder()
                 .status(StatusCode::OK)
                 .body(Body::from(err))
                 .unwrap(),
@@ -49,7 +49,7 @@ async fn submit(Json(payload): Json<Submission>) -> Output {
             use code::rust::rust_compile;
             let wasm = rust_compile(&payload.code).await;
             match wasm {
-                Ok(wasm) => wasm_test(wasm).await,
+                Ok(wasm) => wasm_test(wasm, 100, 100, vec![(vec![], "10".to_string())]).await,
                 Err(err) => err,
             }
         }
@@ -57,10 +57,10 @@ async fn submit(Json(payload): Json<Submission>) -> Output {
             use code::cpp::cpp_compile;
             let wasm = cpp_compile(&payload.code).await;
             match wasm {
-                Ok(wasm) => wasm_test(wasm).await,
+                Ok(wasm) => wasm_test(wasm, 100, 100, vec![(vec![], "10".to_string())]).await,
                 Err(err) => err,
             }
-        },
+        }
         Language::Javascript => Output::ServerError,
         Language::Python => Output::ServerError,
         Language::Java => Output::ServerError,
