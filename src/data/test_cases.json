@@ -1,0 +1,14 @@
+{
+    "1": [
+        {   
+            "id": 1,
+            "stdin": "world",
+            "expected_output": "hello world"
+        },
+        {   
+            "id": 2,
+            "stdin": "name",
+            "expected_output": "hello name"
+        }
+    ]
+}
