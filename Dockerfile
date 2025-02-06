@@ -1,23 +1,19 @@
 FROM alpine:latest
 
 # Install dependencies
-RUN apk add --no-cache \
-    rust \
-    cargo \
-    clang \
-    llvm-dev \
-    clang-dev \
-    lld \
-    libc-dev \
-    gcc \
-    g++ \
-    make
+RUN apk add --no-cache cargo clang
+# firejail
 
 # Set the working directory
 WORKDIR /topsy-turvy
 
 # Copy the Rust project
 COPY . .
+
+# Test dependencies
+RUN rustc -V
+RUN clang++ -v
+# RUN timeout --version
 
 # Build the Rust application
 RUN cargo build --release
