@@ -1,3 +1,4 @@
+use crate::Language;
 use axum::{body::Body, http::Response, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use std::cell::LazyCell;
@@ -39,16 +40,6 @@ pub struct TestCases {
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum Language {
-    Rust,
-    Cpp,
-    Javascript,
-    Python,
-    Java,
-}
-
-#[derive(Deserialize)]
 pub struct Submission {
     problem: usize,
     code: String,
@@ -60,9 +51,16 @@ pub enum Output {
     ServerError,
     InvalidProblem(usize),
     CannotCompile(String),
-    RuntimeError(String),
+    RuntimeError { 
+        stdout: String,
+        stderr: String,
+    },
     Timeout(TestCase),
-    WrongAnswer(TestCase, String),
+    WrongAnswer {
+        test: TestCase,
+        stdout: String,
+        stderr: String,
+    },
     Hidden,
     Accepted(Duration, Duration),
 }
@@ -83,19 +81,19 @@ impl IntoResponse for Output {
                 .status(StatusCode::OK)
                 .body(Body::from(err))
                 .unwrap(),
-            Output::RuntimeError(err) => Response::builder()
+            Output::RuntimeError { stdout, stderr } => Response::builder()
                 .status(StatusCode::OK)
-                .body(Body::from(err))
+                .body(Body::from(format!("Runtime Error\nStdout: {}\nStderr: {}", stdout, stderr)))
                 .unwrap(),
             Output::Timeout(test_case) => Response::builder()
                 .status(StatusCode::OK)
                 .body(Body::from(format!("Timeout: {}", test_case.input)))
                 .unwrap(),
-            Output::WrongAnswer(test_case, output) => Response::builder()
+            Output::WrongAnswer { test, stdout, stderr } => Response::builder()
                 .status(StatusCode::OK)
                 .body(Body::from(format!(
-                    "Wrong Answer: {}\nExpected: {}",
-                    output, test_case.output
+                    "Wrong Answer\nInput: {}\nExpected: {}\nGot: {}\nError: {}",
+                    test.input, test.output, stdout, stderr
                 )))
                 .unwrap(),
             Output::Hidden => Response::builder()
@@ -113,22 +111,36 @@ impl IntoResponse for Output {
     }
 }
 
-pub async fn submit(Json(payload): Json<Submission>) -> Output {
+pub async fn handle_submit(Json(payload): Json<Submission>) -> Output {
+    use tempfile::TempDir;
+    use crate::code::{compile_code, test_code};
     let problem = match PROBLEMS.get(payload.problem) {
         Some(problem) => problem.clone(),
         None => return Output::InvalidProblem(payload.problem),
     };
-    match payload.language {
-        Language::Rust => {
-            use crate::code::rust::rust_run;
-            rust_run(&payload.code, problem).await
-        }
-        Language::Cpp => {
-            use crate::code::cpp::cpp_run;
-            cpp_run(&payload.code, problem).await
-        }
-        Language::Javascript => Output::ServerError,
-        Language::Python => Output::ServerError,
-        Language::Java => Output::ServerError,
+    let dir = TempDir::new().unwrap();
+    if let Err(err) = compile_code(&payload.code, payload.language, dir.path()).await {
+        return err;
     }
+    let mut results = vec![];
+    for test in problem.public {
+        match test_code(payload.language, test, dir.path()).await {
+            Ok(dur) => results.push(dur),
+            Err(err) => return err,
+        }
+    }
+    match test_code(payload.language, problem.hidden, dir.path()).await {
+        Ok(dur) => results.push(dur),
+        Err(Output::WrongAnswer { .. }) => return Output::Hidden,
+        Err(err) => return err,
+    }
+    let avg = results.iter().sum::<Duration>() / results.len() as u32;
+    let error = match results.iter().map(|&r| r.abs_diff(avg)).max() {
+        Some(error) => error,
+        None => {
+            eprintln!("No results");
+            return Output::ServerError;
+        }
+    };
+    Output::Accepted(avg, error)
 }
