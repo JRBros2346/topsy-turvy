@@ -46,7 +46,7 @@ pub async fn compile_code(code: &str, language: Language, dir: &Path) -> Result<
         }
     };
     if !output.status.success() {
-        return Err(Output::CannotCompile(String::from_utf8_lossy(&output.stderr).to_string()));
+        return Err(Output::CannotCompile(String::from_utf8_lossy(&strip_ansi_escapes::strip(output.stderr)).to_string()));
     }
     Ok(())
 }
@@ -91,13 +91,12 @@ pub async fn test_code(language: Language, test: TestCase, dir: &Path) -> Result
     let result = start.elapsed();
     match execution {
         Ok(Ok(output)) => {
-            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            let stdout = String::from_utf8_lossy(&strip_ansi_escapes::strip(output.stdout)).to_string();
+            let stderr = String::from_utf8_lossy(&strip_ansi_escapes::strip(output.stderr)).to_string();
             if !output.status.success() {
                 return Err(Output::RuntimeError { stderr, stdout });
             }
-            let out = String::from_utf8_lossy(&output.stdout).to_string();
-            if out.trim() != test.output {
+            if stdout.trim() != test.output {
                 return Err(Output::WrongAnswer {
                     test,
                     stdout,
