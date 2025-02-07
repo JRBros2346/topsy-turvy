@@ -2,10 +2,14 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+use submit::TestCase;
+
 mod code;
 mod submit;
+mod auth;
 
-pub use submit::{handle_submit, TestCase};
+pub use submit::handle_submit;
+pub use auth::authorize;
 
 #[derive(Deserialize, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
@@ -28,6 +32,7 @@ impl Language {
 #[serde(tag = "status", content = "message")]
 pub enum Output {
     ServerError,
+    Unauthorized,
     InvalidProblem(usize),
     CannotCompile(String),
     RuntimeError { 
