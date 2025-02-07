@@ -8,21 +8,21 @@ const PROBLEMS: LazyCell<[TestCases; 1]> = LazyCell::new(|| {
     [TestCases {
         public: vec![
             TestCase {
-                input: "4\n2 7 11 15\n9\n".to_string(),
-                output: "0 1".to_string(),
+                input: "5\n".to_string(),
+                output: "15".to_string(),
             },
             TestCase {
-                input: "3\n3 2 4\n6\n".to_string(),
-                output: "1 2".to_string(),
+                input: "10\n".to_string(),
+                output: "55".to_string(),
             },
             TestCase {
-                input: "2\n3 3\n6\n".to_string(),
-                output: "0 1".to_string(),
+                input: "6\n".to_string(),
+                output: "21".to_string(),
             },
         ],
         hidden: TestCase {
-            input: "3\n3 2 3\n6\n".to_string(),
-            output: "0 2".to_string(),
+            input: "71\n".to_string(),
+            output: "2556".to_string(),
         },
     }]
 });
