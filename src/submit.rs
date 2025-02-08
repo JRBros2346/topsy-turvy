@@ -130,6 +130,8 @@ async fn handle_submit(
             .map_err(|e| {
                 if let Output::WrongAnswer { .. } = e {
                     Output::Hidden
+                } else if let Output::Timeout(_) = e {
+                    Output::HiddenTimeout
                 } else {
                     e
                 }

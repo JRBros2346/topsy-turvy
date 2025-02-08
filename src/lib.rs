@@ -126,6 +126,7 @@ pub enum Output {
         stderr: String,
     },
     Hidden,
+    HiddenTimeout,
     Accepted(
         #[serde(with = "serde_millis")] Duration,
         #[serde(with = "serde_millis")] Duration,
