@@ -2,5 +2,4 @@ target/
 **/Cargo.lock
 .git/
 .gitignore
-.env
 revil.db

@@ -1,12 +1,14 @@
 CREATE TABLE IF NOT EXISTS players (
     email TEXT PRIMARY KEY,
-    number TEXT UNIQUE
+    number TEXT UNIQUE,
+    solved INT
 );
 
 CREATE TABLE IF NOT EXISTS submissions (
     email TEXT,
-    code TEXT,
+    problem INT,
     language TEXT,
-    status TEXT,
-    FOREIGN KEY(email) REFERENCES players(email)
+    code TEXT,
+    timestamp TEXT,
+    FOREIGN KEY (email) REFERENCES players (email)
 );

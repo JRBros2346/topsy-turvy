@@ -1,45 +1,33 @@
-use libsql::params;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() {
-    use argon2::{
-        password_hash::{rand_core::OsRng, PasswordHasher, SaltString},
-        Argon2,
+    use axum::{
+        http::StatusCode,
+        {routing, Router},
     };
-    use axum::http::StatusCode;
-    use axum::routing;
-    use axum::Router;
-    use libsql::Builder;
-    use std::env;
-    use topsy_turvy::{admin_page, handle_auth, handle_submit, Config};
+    use topsy_turvy::{admin_page, get_solved, handle_auth, handle_submit_with_db, Config};
+    std::env::set_var("RUST_BACKTRACE", "full");
     dotenv::dotenv().ok();
-    let conn = Builder::new_local(env::current_dir().unwrap().join("revil.db"))
-        .build()
-        .await
-        .unwrap()
-        .connect()
-        .unwrap();
-    conn.execute(include_str!("init.sql"), params!())
-        .await
-        .unwrap();
-    let salt = SaltString::generate(&mut OsRng);
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+    tracing::info!("Starting server...");
     axum::serve(
-        tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap(),
+        tokio::net::TcpListener::bind("0.0.0.0:3000")
+            .await
+            .inspect(|_| tracing::info!("Listening on 0.0.0.0:3000"))
+            .inspect_err(|e| tracing::error!("Failed to bind to port 3000: {e:?}"))
+            .unwrap(),
         Router::new()
             .nest("/admin", admin_page())
-            .route("/api/submit", routing::post(handle_submit))
+            .route("/api/submit", routing::post(handle_submit_with_db))
+            .route("/api/solved", routing::get(get_solved))
             .route("/api/auth", routing::post(handle_auth))
-            .with_state(Config {
-                conn,
-                admin_hash: Argon2::default()
-                    .hash_password(env::var("ADMIN_PASS").unwrap().as_bytes(), &salt)
-                    .unwrap()
-                    .to_string(),
-                admin_token: env::var("ADMIN_TOKEN").unwrap(),
-                secret_key: env::var("SECRET_KEY").unwrap(),
-            })
+            .with_state(Config::new().await)
             .fallback(|| async { (StatusCode::NOT_FOUND, "404 Not Found") }),
     )
     .await
+    .inspect_err(|e| tracing::error!("Server error: {:?}", e))
     .unwrap();
 }

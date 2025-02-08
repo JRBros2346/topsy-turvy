@@ -1,7 +1,6 @@
-use axum::{body::Body, extract::State, http::StatusCode, Json};
+use crate::{Config, Output};
+use axum::extract::{Json, State};
 use serde::Deserialize;
-
-use crate::Config;
 
 #[derive(Deserialize)]
 pub struct Player {
@@ -9,61 +8,42 @@ pub struct Player {
     pub number: String,
 }
 
+#[tracing::instrument(name = "handle_ayth", skip(conf, payload))]
 pub async fn handle_auth(
     State(conf): State<Config>,
     Json(payload): Json<Player>,
-) -> Result<Body, StatusCode> {
-    use argon2::{Argon2, PasswordHash, PasswordVerifier};
+) -> Result<Json<Output>, Json<Output>> {
     use libsql::params;
-    if Argon2::default()
-        .verify_password(
-            payload.number.as_bytes(),
-            &conf
-                .conn
-                .query(
-                    "SELECT number FROM players WHERE email = ?1 LIMIT 1",
-                    params![payload.email.clone()],
-                )
-                .await
-                .map_err(|e| {
-                    eprintln!("{e}");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?
-                .next()
-                .await
-                .map_err(|e| {
-                    eprintln!("{e}");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?
-                .ok_or(StatusCode::UNAUTHORIZED)?
-                .get_str(0)
-                .map_err(|e| {
-                    eprintln!("{e}");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })
-                .map(PasswordHash::new)?
-                .map_err(|e| {
-                    eprintln!("{e}");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?,
+    let mut rows = conf
+        .query(
+            "SELECT number FROM players WHERE email = ?1 LIMIT 1",
+            params![payload.email.clone()],
         )
-        .is_ok()
-    {
-        use hmac::{Hmac, Mac};
-        use sha2::Sha256;
-        let mut mac = Hmac::<Sha256>::new_from_slice(conf.secret_key.as_bytes()).map_err(|e| {
-            eprintln!("{e}");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-        mac.update(payload.email.as_bytes());
-        Ok(Body::from(format!(
-            "Token: {}",
-            mac.finalize().into_bytes()[..]
-                .into_iter()
-                .map(|b| format!("{b:02x}"))
-                .collect::<String>()
-        )))
+        .await
+        .ok_or(Output::ServerError)?;
+    let row = rows
+        .next()
+        .await
+        .inspect_err(|e| tracing::error!("{e} {} {}", file!(), line!()))
+        .map_err(|_| Output::ServerError)?;
+    let row = row.ok_or(Output::Unauthorized)?;
+    let number = row
+        .get_str(0)
+        .inspect_err(|e| tracing::error!("{e} {} {}", file!(), line!()))
+        .map_err(|_| Output::ServerError)?
+        .to_string();
+    tracing::debug!(
+        "Recieved number from DB for email {}: {}",
+        payload.email,
+        number
+    );
+    let verify = Config::argon2_verify(&payload.number, &number);
+    tracing::debug!("argon2_verify result: {:?}", verify);
+    if verify == Some(true) {
+        let encrypted = conf.encrypt(&payload.email).ok_or(Output::ServerError)?;
+        tracing::debug!("Encryption successful for email {}", payload.email);
+        Ok(Json(Output::Token(encrypted)))
     } else {
-        Ok(Body::from("Unauthorized"))
+        Err(Json(Output::Unauthorized))
     }
 }
