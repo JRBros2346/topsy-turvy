@@ -2,9 +2,15 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+mod admin;
+mod auth;
 mod code;
+mod config;
 mod submit;
 
+pub use admin::admin_page;
+pub use auth::handle_auth;
+pub use config::Config;
 pub use submit::{handle_submit, TestCase};
 
 #[derive(Deserialize, Clone, Copy)]
@@ -23,14 +29,13 @@ impl Language {
     }
 }
 
-
 #[derive(Serialize)]
 #[serde(tag = "status", content = "message")]
 pub enum Output {
     ServerError,
     InvalidProblem(usize),
     CannotCompile(String),
-    RuntimeError { 
+    RuntimeError {
         stdout: String,
         stderr: String,
     },
