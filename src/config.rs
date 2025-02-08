@@ -1,3 +1,4 @@
+use crate::submit::TestCases;
 use argon2::{Argon2, PasswordHash, PasswordVerifier as _};
 use chacha20poly1305::{
     aead::{Aead as _, Nonce},
@@ -12,6 +13,7 @@ pub struct Config {
     admin_token: String,
     cipher: ChaCha20Poly1305,
     nonce: Nonce<ChaCha20Poly1305>,
+    problems: Vec<TestCases>,
 }
 impl Config {
     pub async fn query(&self, sql: &str, params: impl IntoParams) -> Option<Rows> {
@@ -92,6 +94,12 @@ impl Config {
                 .is_ok(),
         )
     }
+    pub fn problems(&self, idx: usize) -> &TestCases {
+        &self.problems[idx]
+    }
+    pub fn completed(&self, idx: usize) -> bool {
+        idx >= self.problems.len()
+    }
     pub fn hash(text: &str) -> String {
         use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
@@ -101,7 +109,7 @@ impl Config {
     pub async fn new() -> Self {
         use chacha20poly1305::{ChaCha20Poly1305, Key};
         use libsql::{params, Builder};
-        use std::env;
+        use std::{env, fs};
         tracing::info!("Initializing configuration");
         let output = Self {
             conn: Builder::new_local(env::current_dir().unwrap().join("revil.db"))
@@ -118,8 +126,15 @@ impl Config {
             nonce: Nonce::<ChaCha20Poly1305>::clone_from_slice(
                 &hex::decode(Config::hash(&env::var("NONCE").unwrap())).unwrap()[..12],
             ),
+            problems: ron::from_str(
+                &fs::read_to_string(env::current_dir().unwrap().join("test_cases.ron")).unwrap(),
+            )
+            .unwrap(),
         };
-        output.execute(include_str!("init.sql"), params![]).await;
+        output.execute(include_str!("players.sql"), params![]).await;
+        output
+            .execute(include_str!("submissions.sql"), params![])
+            .await;
         output
     }
 }

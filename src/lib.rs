@@ -113,6 +113,7 @@ pub enum Output {
     Token(String),
     Solved(usize),
     InvalidProblem(usize),
+    Completed,
     CannotCompile(String),
     RuntimeError {
         stdout: String,
