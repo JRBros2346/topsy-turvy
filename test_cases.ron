@@ -1,0 +1,22 @@
+[
+    TestCases (
+        public: [
+            TestCase (
+                input: "5",
+                output: "15",
+            ),
+            TestCase (
+                input: "10",
+                output: "55",
+            ),
+            TestCase (
+                input: "6",
+                output: "21",
+            ),
+        ],
+        hidden: TestCase (
+            input: "71",
+            output: "2556",
+        ),
+    ),
+]
