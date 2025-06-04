@@ -1,27 +1,52 @@
 FROM alpine:latest
 
-# Install dependencies
-RUN apk add --no-cache cargo clang19 python3 openjdk21 deno
+# Install build dependencies
+RUN apk add --no-cache \
+    build-base \
+    cargo \
+    rust \
+    deno \
+    clang20 \
+    python3 \
+    openjdk21 \
+    nsjail
 
-# Set the working directory
+# Create and set working directory
 WORKDIR /topsy-turvy
 
-# Copy the Rust project
+# Copy only Cargo.toml first to leverage Docker layer caching
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs && \
+    touch src/lib.rs && \
+    cargo b --release && \
+    rm -rf src
+
+# Copy the full source now
 COPY . .
 
-# Test dependencies
-RUN rustc -V
-RUN clang++ -v
-RUN python3 -v
-RUN javac -version
-RUN java -version
-RUN deno -v
+# Optionally run tests here only in dev builds
+RUN cargo t --release
 
-# Build the Rust application
-RUN cargo build --release
+# Build & install the binary
+RUN cargo b --release && \
+    mv target/release/topsy-turvy /usr/local/bin/ && \
+    strip /usr/local/bin/topsy-turvy
 
-# Expose the web app's port (modify if needed)
+# Clean up build tools and files
+RUN apk del cargo build-base && \
+    rm -rf /topsy-turvy /root/.cargo /root/.rustup /usr/lib/rustlib
+
+# Verify installed tools (combine into single layer)
+RUN rustc -V && \
+    deno -v && \
+    clang++ -v && \
+    python3 -V && \
+    javac -version && \
+    java -version
+
+# Expose port if needed
 EXPOSE 3000
 
-# Run the app
-CMD ["./target/release/topsy-turvy"]
+# Entry point
+CMD ["topsy-turvy"]
