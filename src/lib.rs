@@ -4,16 +4,16 @@ use axum::{extract::State, http::HeaderMap, Json};
 use libsql::params::IntoValue;
 use serde::{Deserialize, Serialize};
 
-use submit::TestCase;
-
 mod admin;
-mod auth;
 mod auth;
 mod code;
 mod config;
 mod submit;
 
-pub use submit::{handle_submit, TestCase};
+pub use admin::admin_page;
+pub use auth::handle_auth;
+pub use config::Config;
+pub use submit::{handle_submit, handle_submit_with_db, TestCase};
 
 #[tracing::instrument(name = "get_solved", skip(headers, conf))]
 pub async fn get_solved(headers: HeaderMap, State(conf): State<Config>) -> Json<Output> {
@@ -128,4 +128,7 @@ pub enum Output {
         #[serde(with = "serde_millis")] Duration,
         #[serde(with = "serde_millis")] Duration,
     ),
+    Unauthorized,
+    Solved(usize),
+    Token(String),
 }

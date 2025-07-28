@@ -1,12 +1,12 @@
+use axum::{
+    http::StatusCode,
+    {routing, Router},
+};
+use topsy_turvy::{admin_page, get_solved, handle_auth, handle_submit_with_db, Config};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() {
-    use axum::{
-        http::StatusCode,
-        {routing, Router},
-    };
-    use topsy_turvy::{admin_page, get_solved, handle_auth, handle_submit_with_db, Config};
     std::env::set_var("RUST_BACKTRACE", "full");
     dotenv::dotenv().ok();
     tracing_subscriber::registry()

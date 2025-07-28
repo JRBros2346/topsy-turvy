@@ -108,7 +108,7 @@ pub async fn handle_submit_with_db(
 }
 
 #[tracing::instrument(name = "handle_submit", skip(code))]
-async fn handle_submit(
+pub async fn handle_submit(
     tests: &TestCases,
     code: &str,
     language: Language,
