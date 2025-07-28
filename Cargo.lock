@@ -408,6 +408,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "code-judge"
+version = "0.1.0"
+dependencies = [
+ "axum 0.8.4",
+ "futures",
+ "libsql",
+ "serde",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2030,20 +2044,6 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
-]
-
-[[package]]
-name = "topsy-turvy"
-version = "0.1.0"
-dependencies = [
- "axum 0.8.4",
- "futures",
- "libsql",
- "serde",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
