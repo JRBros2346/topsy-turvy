@@ -36,10 +36,7 @@ impl Config {
             .ok()
     }
     pub fn get_admin_token(&self, password: &str) -> Option<String> {
-        match Self::argon2_verify(password, &self.admin_hash) {
-            Some(true) => Some(self.admin_token.clone()),
-            _ => None,
-        }
+        Self::argon2_verify(password, &self.admin_hash).map(|_| self.admin_token.clone())
     }
     pub fn verify_admin_token(&self, token: &str) -> bool {
         token == self.admin_token

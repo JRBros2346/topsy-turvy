@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS players (
-    email TEXT PRIMARY KEY,
-    number TEXT UNIQUE,
+    user_id TEXT PRIMARY KEY,
+    password TEXT UNIQUE,
     solved INT
 );

@@ -8,28 +8,13 @@ use tracing::{debug, error, info};
 //
 #[derive(Deserialize)]
 pub struct Player {
-    pub email: String,
-    pub number: String,
-}
-
-#[derive(Deserialize)]
-pub struct SetCounter {
-    pub email: String,
-    pub count: u32,
-}
-
-//
-// Structures for Query Results
-//
-#[derive(Serialize)]
-pub struct PlayerInfo {
-    pub email: String,
-    pub solved: u32,
+    pub user_id: String,
+    pub password: String,
 }
 
 #[derive(Serialize)]
 pub struct SubmissionInfo {
-    pub email: String,
+    pub user_id: String,
     pub problem: u32,
     pub language: String,
     pub code: String,
@@ -45,7 +30,7 @@ pub enum AdminOutput {
     Success(String),
     Failure(String),
     Unauthorized,
-    Players(Vec<PlayerInfo>),
+    Players(Vec<String>),
     Submissions(Vec<SubmissionInfo>),
 }
 
@@ -91,45 +76,45 @@ async fn add_player(
     }
     match conf
         .query(
-            "SELECT email FROM players WHERE email = ?1",
-            params![payload.email.clone()],
+            "SELECT user_id FROM players WHERE user_id = ?1",
+            params![payload.user_id.clone()],
         )
         .await
     {
         Some(mut rows) => {
             if let Ok(Some(_)) = rows.next().await {
-                tracing::warn!("Player with email {} already exists", payload.email);
+                tracing::warn!("Player with user_id {} already exists", payload.user_id);
                 return Json(AdminOutput::Failure("Player already exists".to_string()));
             }
         }
         None => {
             error!(
                 "Database query error while checking player existence for {}",
-                payload.email
+                payload.user_id
             );
             return Json(AdminOutput::Failure("Database error".to_string()));
         }
     }
-    let hashed = match Config::argon2_generate(&payload.number) {
+    let hashed = match Config::argon2_generate(&payload.password) {
         Some(hash) => hash,
         None => {
-            error!("Failed to generate password hash for {}", payload.email);
+            error!("Failed to generate password hash for {}", payload.user_id);
             return Json(AdminOutput::Failure("Failed to hash password".to_string()));
         }
     };
     conf.execute(
         "INSERT INTO players VALUES (?1, ?2, 0)",
-        params![payload.email.clone(), hashed],
+        params![payload.user_id.clone(), hashed],
     )
     .await;
-    info!("Added new player with email {}", payload.email);
+    info!("Added new player with user_id {}", payload.user_id);
     Json(AdminOutput::Success(
         "Player added successfully".to_string(),
     ))
 }
 
-#[tracing::instrument(name = "player_password", skip(conf, payload))]
-async fn player_password(
+#[tracing::instrument(name = "change_password", skip(conf, payload))]
+async fn change_password(
     headers: HeaderMap,
     State(conf): State<Config>,
     Json(payload): Json<Player>,
@@ -138,47 +123,23 @@ async fn player_password(
     if !is_auth(headers, &conf).await {
         return Json(AdminOutput::Unauthorized);
     }
-    let hashed = match Config::argon2_generate(&payload.number) {
+    let hashed = match Config::argon2_generate(&payload.password) {
         Some(hash) => hash,
         None => {
-            error!("Failed to generate password hash for {}", payload.email);
+            error!("Failed to generate password hash for {}", payload.user_id);
             return Json(AdminOutput::Failure(
                 "Failed to hash new password".to_string(),
             ));
         }
     };
     conf.execute(
-        "UPDATE players SET number = ?1 WHERE email = ?2",
-        params![hashed, payload.email.clone()],
+        "UPDATE players SET password = ?1 WHERE user_id = ?2",
+        params![hashed, payload.user_id.clone()],
     )
     .await;
-    info!("Updated password for player {}", payload.email);
+    info!("Updated password for player {}", payload.user_id);
     Json(AdminOutput::Success(
         "Password updated successfully".to_string(),
-    ))
-}
-
-#[tracing::instrument(name = "set_counter", skip(conf, payload))]
-async fn set_counter(
-    headers: HeaderMap,
-    State(conf): State<Config>,
-    Json(payload): Json<SetCounter>,
-) -> Json<AdminOutput> {
-    use libsql::params;
-    if !is_auth(headers, &conf).await {
-        return Json(AdminOutput::Unauthorized);
-    }
-    conf.execute(
-        "UPDATE players SET solved = ?1 WHERE email = ?2",
-        params![payload.count, payload.email.clone()],
-    )
-    .await;
-    info!(
-        "Set solved counter for player {} to {}",
-        payload.email, payload.count
-    );
-    Json(AdminOutput::Success(
-        "Player solved counter set successfully".to_string(),
     ))
 }
 
@@ -188,10 +149,7 @@ async fn get_players(headers: HeaderMap, State(conf): State<Config>) -> Json<Adm
     if !is_auth(headers.clone(), &conf).await {
         return Json(AdminOutput::Unauthorized);
     }
-    let mut rows = match conf
-        .query("SELECT email, solved FROM players", params![])
-        .await
-    {
+    let mut rows = match conf.query("SELECT user_id FROM players", params![]).await {
         Some(rows) => rows,
         None => {
             error!("Database query error in get_players");
@@ -200,21 +158,14 @@ async fn get_players(headers: HeaderMap, State(conf): State<Config>) -> Json<Adm
     };
     let mut players = Vec::new();
     while let Ok(Some(row)) = rows.next().await {
-        let email = match row.get_str(0) {
+        let user_id = match row.get_str(0) {
             Ok(val) => val.to_string(),
             Err(e) => {
-                error!("Error getting email: {:?}", e);
+                error!("Error getting user_id: {:?}", e);
                 continue;
             }
         };
-        let solved = match row.get::<u64>(1) {
-            Ok(val) => val as u32,
-            Err(e) => {
-                error!("Error getting solved: {:?}", e);
-                continue;
-            }
-        };
-        players.push(PlayerInfo { email, solved });
+        players.push(user_id);
     }
     info!("Retrieved {} players", players.len());
     Json(AdminOutput::Players(players))
@@ -228,7 +179,7 @@ async fn get_submissions(headers: HeaderMap, State(conf): State<Config>) -> Json
     }
     let mut rows = match conf
         .query(
-            "SELECT email, problem, language, code, timestamp FROM submissions",
+            "SELECT user_id, problem, language, code, timestamp FROM submissions",
             params![],
         )
         .await
@@ -241,10 +192,10 @@ async fn get_submissions(headers: HeaderMap, State(conf): State<Config>) -> Json
     };
     let mut submissions = Vec::new();
     while let Ok(Some(row)) = rows.next().await {
-        let email = match row.get_str(0) {
+        let user_id = match row.get_str(0) {
             Ok(val) => val.to_string(),
             Err(e) => {
-                error!("Error getting email: {:?}", e);
+                error!("Error getting user_id: {:?}", e);
                 continue;
             }
         };
@@ -277,7 +228,7 @@ async fn get_submissions(headers: HeaderMap, State(conf): State<Config>) -> Json
             }
         };
         submissions.push(SubmissionInfo {
-            email,
+            user_id,
             problem,
             language,
             code,
@@ -297,8 +248,7 @@ pub fn admin_page() -> Router<Config> {
         // .route("/", routing::get(web_page))
         .route("/auth", routing::post(authorize))
         .route("/add_player", routing::post(add_player))
-        .route("/player_password", routing::post(player_password))
-        .route("/set_counter", routing::post(set_counter))
+        .route("/change_password", routing::post(change_password))
         .route("/get_players", routing::get(get_players))
         .route("/get_submissions", routing::get(get_submissions))
 }

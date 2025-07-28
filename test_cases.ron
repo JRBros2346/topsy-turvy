@@ -2,6 +2,18 @@
     TestCases (
         public: [
             TestCase (
+                input: "",
+                output: "Hello",
+            ),
+        ],
+        hidden: TestCase (
+            input: "",
+            output: "Hello",
+        ),
+    ),
+    TestCases (
+        public: [
+            TestCase (
                 input: "5",
                 output: "15",
             ),

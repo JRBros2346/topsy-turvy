@@ -22,7 +22,6 @@ async fn main() {
         Router::new()
             .nest("/admin", admin_page())
             .route("/api/submit", routing::post(handle_submit_with_db))
-            .route("/api/solved", routing::get(get_solved))
             .route("/api/auth", routing::post(handle_auth))
             .with_state(Config::new().await)
             .fallback(|| async { (StatusCode::NOT_FOUND, "404 Not Found") }),

@@ -43,7 +43,7 @@ pub async fn handle_submit_with_db(
             .ok_or(Output::Unauthorized)?;
         let mut rows = conf
             .query(
-                "SELECT solved FROM players WHERE email = ?1 LIMIT 1",
+                "SELECT solved FROM players WHERE user_id = ?1 LIMIT 1",
                 params![user.clone()],
             )
             .await
@@ -88,7 +88,7 @@ pub async fn handle_submit_with_db(
                     .map_err(|_| Output::ServerError)?;
                 transaction
                     .execute(
-                        "UPDATE players SET solved = ?1 WHERE email = ?2",
+                        "UPDATE players SET solved = ?1 WHERE user_id = ?2",
                         params![problem as u64 + 1, user],
                     )
                     .await
